@@ -49,11 +49,6 @@ public class MainMenuScreen implements Screen {
         float x = (Gdx.graphics.getWidth() - textWidth) / 2;
         float y = (Gdx.graphics.getHeight() + textHeight) / 2;
 
-        //test
-        System.out.println("text height is- "+textHeight);
-        System.out.println("text width is- "+textWidth);
-        System.out.println("Height of your phone is- "+Gdx.graphics.getHeight());
-        System.out.println("Width of your phone is- "+Gdx.graphics.getWidth());
 
         font.draw(batch, text, x, y);
         batch.end();

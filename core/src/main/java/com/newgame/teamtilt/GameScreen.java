@@ -3,14 +3,27 @@ package com.newgame.teamtilt;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
-
+import com.badlogic.gdx.graphics.Texture;
 
 public class GameScreen implements Screen {
     final TeamTiltMain game;
+    private Texture backgroundTexture;
+    private Texture characterTexture;
+
+    // Character position
+    private float characterX;
+    private float characterY;
 
     public GameScreen(final TeamTiltMain game) {
         this.game = game;
-        // Initialize game assets and objects here
+
+        // Load the background and character textures
+        backgroundTexture = new Texture(Gdx.files.internal("backgrounds/background.png"));
+        characterTexture = new Texture(Gdx.files.internal("characters/character.png"));
+
+        // Set initial character position (centered on screen)
+        characterX = (Gdx.graphics.getWidth() - characterTexture.getWidth()) / 2;
+        characterY = (Gdx.graphics.getHeight() - characterTexture.getHeight()) / 2;
     }
 
     @Override
@@ -18,12 +31,14 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        // Clear the screen with a white background
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Handle game logic and rendering here
+        // Draw the background and character
         game.batch.begin();
-        // Render game objects here
+        game.batch.draw(backgroundTexture, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight()); // Draw background
+        game.batch.draw(characterTexture, characterX, characterY); // Draw character
         game.batch.end();
     }
 
@@ -41,6 +56,8 @@ public class GameScreen implements Screen {
 
     @Override
     public void dispose() {
-        // Dispose of assets when done
+        // Dispose of the textures to prevent memory leaks
+        backgroundTexture.dispose();
+        characterTexture.dispose();
     }
 }
