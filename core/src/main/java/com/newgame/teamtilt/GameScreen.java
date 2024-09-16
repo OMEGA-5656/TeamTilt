@@ -31,8 +31,8 @@ public class GameScreen implements Screen {
         platformTexture = new Texture(Gdx.files.internal("platforms/platform.png"));
 
         // Set initial character position (centered on screen)
-        characterX = (Gdx.graphics.getWidth() - characterTexture.getWidth()) / 2;
-        characterY = (Gdx.graphics.getHeight() - characterTexture.getHeight()) / 2;
+        characterX = 150;
+        characterY = 120;
 
         // Set platform size and position
         platform = new Rectangle();
@@ -54,14 +54,19 @@ public class GameScreen implements Screen {
         // Apply gravity if not grounded
         if (!isGrounded) {
             velocityY += gravity * delta;
-            characterY += velocityY * delta;
         }
+        characterY += velocityY * delta;
 
         // Collision detection with platform
-        if (characterY <= platform.y + platform.height && characterX + characterTexture.getWidth() > platform.x && characterX < platform.x + platform.width) {
-            characterY = platform.y + platform.height; // Snap character to platform
-            velocityY = 0; // Stop vertical movement
-            isGrounded = true;
+        if (characterY <= platform.y + platform.height && characterY + characterTexture.getHeight() >= platform.y &&
+            characterX + characterTexture.getWidth() > platform.x && characterX < platform.x + platform.width) {
+
+            // If falling down and the character's feet are on the platform
+            if (velocityY < 0) {
+                characterY = platform.y + platform.height; // Snap character to platform
+                velocityY = 0; // Stop vertical movement
+                isGrounded = true;
+            }
         } else {
             isGrounded = false; // Allow falling if not on platform
         }
