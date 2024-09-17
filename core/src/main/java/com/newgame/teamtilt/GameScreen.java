@@ -6,17 +6,24 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.assets.AssetManager;
+import com.badlogic.gdx.assets.AssetDescriptor;
+import com.badlogic.gdx.assets.loaders.SoundLoader;
+
 
 public class GameScreen implements Screen {
     final TeamTiltMain game;
     private Texture backgroundTexture;
     private Texture characterTexture;
     private Texture platformTexture;
+    private Sound buttonClick;
 
     // Character position and physics variables
     private float characterX;
@@ -40,6 +47,10 @@ public class GameScreen implements Screen {
     // Movement parameters
     private float speed = 200f;
 
+    // Starting position of the character
+    private final float startX = 150;
+    private final float startY = 120;
+
     public GameScreen(final TeamTiltMain game) {
         this.game = game;
 
@@ -49,8 +60,8 @@ public class GameScreen implements Screen {
         platformTexture = new Texture(Gdx.files.internal("platforms/platform.png"));
 
         // Set initial character position
-        characterX = 150;
-        characterY = 120;
+        characterX = startX;
+        characterY = startY;
 
         // Initialize platforms array
         platforms = new Array<>();
@@ -65,6 +76,9 @@ public class GameScreen implements Screen {
         Texture rightTexture = new Texture(Gdx.files.internal("buttons/right.png"));
         Texture jumpTexture = new Texture(Gdx.files.internal("buttons/jump.png"));
 
+        // Load button click sounds
+        Sound buttonClickSound = Gdx.audio.newSound(Gdx.files.internal("sounds/buttonClickSound.wav"));
+
         // Create buttons with the textures
         leftButton = new ImageButton(new TextureRegionDrawable(leftTexture));
         rightButton = new ImageButton(new TextureRegionDrawable(rightTexture));
@@ -76,35 +90,43 @@ public class GameScreen implements Screen {
         jumpButton.setPosition(Gdx.graphics.getWidth() - 150, 50);
 
         // Add listeners for buttons
-        leftButton.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+        leftButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                Gdx.app.log("Button", "Left button touched");
+                buttonClickSound.play();
                 moveLeft = true;
                 return true;
             }
 
             @Override
             public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+                Gdx.app.log("Button", "Left button released");
                 moveLeft = false;
             }
         });
 
-        rightButton.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+        rightButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                Gdx.app.log("Button", "Right button touched");
+                buttonClickSound.play();
                 moveRight = true;
                 return true;
             }
 
             @Override
             public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
+                Gdx.app.log("Button", "Right button released");
                 moveRight = false;
             }
         });
 
-        jumpButton.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
+        jumpButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                Gdx.app.log("Button", "Jump button touched");
+                buttonClickSound.play();
                 if (isGrounded) {
                     velocityY = 250f; // Jump velocity
                     isGrounded = false;
@@ -158,12 +180,27 @@ public class GameScreen implements Screen {
         // Collision detection with any platform
         isGrounded = false; // Reset grounded state
         for (Rectangle platform : platforms) {
-            if (characterY <= platform.y + platform.height && characterX + characterTexture.getWidth() > platform.x && characterX < platform.x + platform.width) {
-                characterY = platform.y + platform.height; // Snap character to platform
+            // Check if the character is above the platform and falling down onto it
+            if (characterY <= platform.y + platform.height // Character is above the platform
+                && characterY + velocityY * delta <= platform.y + platform.height // Character is falling onto the platform
+                && characterX + characterTexture.getWidth() > platform.x // Character's right side is past the platform's left side
+                && characterX < platform.x + platform.width) { // Character's left side is before the platform's right side
+
+                // Land the character on the platform
+                characterY = platform.y + platform.height; // Align the character with the platform's top
                 velocityY = 0; // Stop vertical movement
                 isGrounded = true; // Character is grounded
-                break; // No need to check other platforms
+                break; // Stop checking other platforms
             }
+        }
+
+        // Check if the character has fallen off the screen
+        if (characterY + characterTexture.getHeight() < 0) {
+            // Respawn the character if it's fallen below the screen height
+            characterX = startX;
+            characterY = startY;
+            velocityY = 0;
+            isGrounded = false;
         }
 
         // Draw the background, platforms, and character
@@ -183,6 +220,7 @@ public class GameScreen implements Screen {
         stage.act(delta);
         stage.draw();
     }
+
 
     @Override
     public void resize(int width, int height) {
