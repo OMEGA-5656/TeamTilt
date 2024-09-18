@@ -28,7 +28,7 @@ public class GameScreen implements Screen {
     // Box2D variables
     public World world;
     private Box2DDebugRenderer debugRenderer;
-    public Array<Body> platformBodies;
+    public Array<Platform> platforms;
 
     // Player instance
     private Player player;
@@ -44,7 +44,7 @@ public class GameScreen implements Screen {
         // Initialize Box2D world
         world = new World(new Vector2(0, -9.8f), true);
         debugRenderer = new Box2DDebugRenderer();
-        platformBodies = new Array<>();
+        platforms = new Array<>();
 
         // Create player
         player = new Player(world, characterTexture);
@@ -77,33 +77,13 @@ public class GameScreen implements Screen {
         createTouchControls();
         Gdx.input.setInputProcessor(stage);
 
-        addPlatform(100, 100, 300, 20);
-        addPlatform(400, 120, 300, 20);
-        addPlatform(700, 170, 300, 20);
-        addPlatform(400, 240, 300, 20);
-        addPlatform(50, 240, 300, 20);
+        // Add platforms using the new Platform class
+        platforms.add(new Platform(world, 100, 100, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+        platforms.add(new Platform(world, 400, 120, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+        platforms.add(new Platform(world, 700, 170, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+        platforms.add(new Platform(world, 400, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+        platforms.add(new Platform(world, 50, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
     }
-
-    private void addPlatform(float x, float y, float width, float height) {
-        BodyDef bodyDef = new BodyDef();
-        bodyDef.type = BodyDef.BodyType.StaticBody;
-        bodyDef.position.set((x + width / 2) / player.getPPM(), (y + height / 2) / player.getPPM());
-
-        Body platformBody = world.createBody(bodyDef);
-
-        PolygonShape shape = new PolygonShape();
-        shape.setAsBox(width / 2 / player.getPPM(), height / 2 / player.getPPM());
-
-        FixtureDef fixtureDef = new FixtureDef();
-        fixtureDef.shape = shape;
-        fixtureDef.friction = 5f;
-
-        platformBody.createFixture(fixtureDef);
-        platformBodies.add(platformBody);
-        shape.dispose();
-    }
-
-
 
     private void createTouchControls() {
         // Load button textures
@@ -184,8 +164,8 @@ public class GameScreen implements Screen {
         game.batch.draw(backgroundTexture, 0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
         // Draw platforms
-        for (Body platformBody : platformBodies) {
-            Vector2 position = platformBody.getPosition();
+        for (Platform platform : platforms) {
+            Vector2 position = platform.getPosition();
             float platformX = (position.x * player.getPPM()) - (PLATFORM_WIDTH / 2);
             float platformY = (position.y * player.getPPM()) - (PLATFORM_HEIGHT / 2);
             game.batch.draw(platformTexture, platformX, platformY, PLATFORM_WIDTH, PLATFORM_HEIGHT);
