@@ -14,6 +14,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.sun.source.tree.UsesTree;
 
 public class GameScreen implements Screen {
     final TeamTiltMain game;
@@ -23,8 +24,9 @@ public class GameScreen implements Screen {
     private Stage stage;
     private ImageButton leftButton, rightButton, jumpButton;
     private boolean moveLeft = false, moveRight = false;
+    private boolean isGrounded=false;
 
-    private final float speed = 5f;
+    private final float speed = 2.5f;
     private float PPM = 100f; // Pixels per meter
 
     // Box2D variables
@@ -53,9 +55,34 @@ public class GameScreen implements Screen {
         createCharacterBody();
         addPlatform(100, 100, 300, 20);
         addPlatform(400, 120, 300, 20);
-        addPlatform(700, 200, 300, 20);
+        addPlatform(700, 170, 300, 20);
         addPlatform(400, 240, 300, 20);
         addPlatform(50, 240, 300, 20);
+
+        //Checks if the characterBody is in contact with platforms
+        world.setContactListener(new ContactListener() {
+            @Override
+            public void beginContact(Contact contact) {
+                // Check if the character is touching a platform
+                if (contact.getFixtureA().getBody() == characterBody || contact.getFixtureB().getBody() == characterBody) {
+                    isGrounded = true;
+                }
+            }
+
+            @Override
+            public void endContact(Contact contact) {
+                // Check if the character is leaving the platform
+                if (contact.getFixtureA().getBody() == characterBody || contact.getFixtureB().getBody() == characterBody) {
+                    isGrounded = false;
+                }
+            }
+
+            @Override
+            public void preSolve(Contact contact, Manifold oldManifold) {}
+
+            @Override
+            public void postSolve(Contact contact, ContactImpulse impulse) {}
+        });
 
         // Initialize stage and touch controls
         stage = new Stage(new ScreenViewport());
@@ -75,9 +102,10 @@ public class GameScreen implements Screen {
 
         FixtureDef fixtureDef = new FixtureDef();
         fixtureDef.shape = shape;
-        fixtureDef.density = 1f;
+        fixtureDef.density = 5f;
 
         characterBody.createFixture(fixtureDef);
+        characterBody.setFixedRotation(true);
         shape.dispose();
     }
 
@@ -93,7 +121,7 @@ public class GameScreen implements Screen {
 
         FixtureDef fixtureDef = new FixtureDef();
         fixtureDef.shape = shape;
-        fixtureDef.friction = 0.7f;
+        fixtureDef.friction = 5f;
 
         platformBody.createFixture(fixtureDef);
         platformBodies.add(platformBody);
@@ -114,6 +142,7 @@ public class GameScreen implements Screen {
         leftButton.setPosition(50, 50);
         rightButton.setPosition(200, 50);
         jumpButton.setPosition(Gdx.graphics.getWidth() - 150, 50);
+
 
         leftButton.addListener(new InputListener() {
             @Override
@@ -144,8 +173,11 @@ public class GameScreen implements Screen {
         jumpButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if(!characterBody.isAwake())
-                    characterBody.applyLinearImpulse(new Vector2(0, 0.5f), characterBody.getWorldCenter(), true);
+                if (isGrounded) {
+                    // Apply a linear impulse upwards to simulate jumping
+                    characterBody.applyLinearImpulse(new Vector2(0, 2f), characterBody.getWorldCenter(), true);
+                    isGrounded = false; // Assume the character will no longer be grounded after jumping
+                }
                 return true;
             }
         });
@@ -186,6 +218,7 @@ public class GameScreen implements Screen {
         for (Body platformBody : platformBodies) {
             Vector2 position = platformBody.getPosition();
             game.batch.draw(platformTexture, (position.x * PPM) - (300 / 2), (position.y * PPM) - (20 / 2), 300, 20);
+
         }
         game.batch.draw(characterTexture, characterX, characterY);
         game.batch.end();
