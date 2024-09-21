@@ -32,6 +32,7 @@ public class GameScreen implements Screen {
 
     // Player instance
     private Player player;
+    private InputHandler inputHandler;
 
     public GameScreen(final TeamTiltMain game) {
         this.game = game;
@@ -49,19 +50,23 @@ public class GameScreen implements Screen {
         // Create player
         player = new Player(world, characterTexture);
 
+        // Initialize InputHandler and set it as the input processor
+        inputHandler = new InputHandler(player.getBody(), player.getSpeed());
+        Gdx.input.setInputProcessor(inputHandler);
+
         // Contact listener
         world.setContactListener(new ContactListener() {
             @Override
             public void beginContact(Contact contact) {
                 if (contact.getFixtureA().getBody() == player.getBody() || contact.getFixtureB().getBody() == player.getBody()) {
-                    isGrounded = true;
+                    inputHandler.setGrounded(true);
                 }
             }
 
             @Override
             public void endContact(Contact contact) {
                 if (contact.getFixtureA().getBody() == player.getBody() || contact.getFixtureB().getBody() == player.getBody()) {
-                    isGrounded = false;
+                    inputHandler.setGrounded(false);
                 }
             }
 
@@ -103,36 +108,33 @@ public class GameScreen implements Screen {
         leftButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                moveLeft = true;
+                inputHandler.moveLeft();
                 return true;
             }
 
             @Override
             public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                moveLeft = false;
+                inputHandler.stopMovement();
             }
         });
 
         rightButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                moveRight = true;
+                inputHandler.moveRight();
                 return true;
             }
 
             @Override
             public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                moveRight = false;
+                inputHandler.stopMovement();
             }
         });
 
         jumpButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                if (isGrounded) {
-                    player.jump();
-                    isGrounded = false;
-                }
+                inputHandler.jump();
                 return true;
             }
         });
@@ -144,6 +146,11 @@ public class GameScreen implements Screen {
     }
 
     @Override
+    public void show() {
+
+    }
+
+    @Override
     public void render(float delta) {
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -152,7 +159,8 @@ public class GameScreen implements Screen {
         world.step(1 / 60f, 6, 2);
 
         // Update player movement
-        player.updateMovement(moveLeft, moveRight);
+        inputHandler.updateMovement();
+        player.updateMovement(inputHandler.moveLeft, inputHandler.moveRight);
 
         // Respawn player if falling
         if (player.isFalling()) {
@@ -192,18 +200,6 @@ public class GameScreen implements Screen {
     }
 
     @Override
-    public void dispose() {
-        backgroundTexture.dispose();
-        platformTexture.dispose();
-        stage.dispose();
-        world.dispose();
-        debugRenderer.dispose();
-    }
-
-    @Override
-    public void show() {}
-
-    @Override
     public void pause() {}
 
     @Override
@@ -211,4 +207,14 @@ public class GameScreen implements Screen {
 
     @Override
     public void hide() {}
+
+    @Override
+    public void dispose() {
+        backgroundTexture.dispose();
+        platformTexture.dispose();
+        player.getTexture().dispose();
+        world.dispose();
+        debugRenderer.dispose();
+        stage.dispose();
+    }
 }
