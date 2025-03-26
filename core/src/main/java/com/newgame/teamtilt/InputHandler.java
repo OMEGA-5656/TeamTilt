@@ -1,6 +1,8 @@
 package com.newgame.teamtilt;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 
@@ -11,6 +13,7 @@ public class InputHandler implements InputProcessor {
     boolean moveRight = false;
     private boolean isGrounded = false;
 
+    Sound jump_sound = Gdx.audio.newSound(Gdx.files.internal("sounds/jump_sound.wav"));
     public InputHandler(Body playerBody, float speed) {
         this.playerBody = playerBody;
         this.speed = speed;
@@ -29,6 +32,8 @@ public class InputHandler implements InputProcessor {
         if (isGrounded) {
             playerBody.applyLinearImpulse(new Vector2(0, 2f), playerBody.getWorldCenter(), true);
             isGrounded = false;
+            jump_sound.play();
+            System.out.println("Played jump sound!");
         }
     }
 
