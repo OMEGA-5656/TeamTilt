@@ -9,7 +9,14 @@ import com.badlogic.gdx.physics.box2d.*;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.Group;
 import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
@@ -18,10 +25,16 @@ public class GameScreen implements Screen {
     final TeamTiltMain game;
     private Texture backgroundTexture;
     private Texture platformTexture;
+    private Texture leftTexture, rightTexture, jumpTexture;
+    private Texture buttonUpTexture, buttonDownTexture, overlayTexture;
     private Stage stage;
     private ImageButton leftButton, rightButton, jumpButton;
-    private boolean moveLeft = false, moveRight = false;
-    private boolean isGrounded = false;
+    private TextButton pauseButton, resumeButton, quitButton;
+    private Image overlayImage;
+    private Group pauseMenuGroup;
+    private Skin uiSkin;
+    private boolean isPaused = false;
+    // Movement and grounded state handled by InputHandler
     private final float PLATFORM_WIDTH = 300;
     private final float PLATFORM_HEIGHT = 20;
 
@@ -52,7 +65,6 @@ public class GameScreen implements Screen {
 
         // Initialize InputHandler and set it as the input processor
         inputHandler = new InputHandler(player.getBody(), player.getSpeed());
-        Gdx.input.setInputProcessor(inputHandler);
 
         // Contact listener
         world.setContactListener(new ContactListener() {
@@ -82,6 +94,10 @@ public class GameScreen implements Screen {
         createTouchControls();
         Gdx.input.setInputProcessor(stage);
 
+        // Initialize pause UI
+        setupUiSkin();
+        createPauseControls();
+
         // Add platforms using the new Platform class
         platforms.add(new Platform(world, 100, 100, PLATFORM_WIDTH, PLATFORM_HEIGHT));
         platforms.add(new Platform(world, 400, 120, PLATFORM_WIDTH, PLATFORM_HEIGHT));
@@ -92,9 +108,9 @@ public class GameScreen implements Screen {
 
     private void createTouchControls() {
         // Load button textures
-        Texture leftTexture = new Texture(Gdx.files.internal("buttons/left.png"));
-        Texture rightTexture = new Texture(Gdx.files.internal("buttons/right.png"));
-        Texture jumpTexture = new Texture(Gdx.files.internal("buttons/jump.png"));
+        leftTexture = new Texture(Gdx.files.internal("buttons/left.png"));
+        rightTexture = new Texture(Gdx.files.internal("buttons/right.png"));
+        jumpTexture = new Texture(Gdx.files.internal("buttons/jump.png"));
 
         // Create buttons
         leftButton = new ImageButton(new TextureRegionDrawable(leftTexture));
@@ -145,6 +161,98 @@ public class GameScreen implements Screen {
         stage.addActor(jumpButton);
     }
 
+    private void setupUiSkin() {
+        uiSkin = new Skin();
+        BitmapFont font = new BitmapFont();
+        font.getData().setScale(2f);
+        uiSkin.add("default-font", font, BitmapFont.class);
+
+        // Create simple colored textures for button states
+        buttonUpTexture = createColoredTexture(1, 1, 0.2f, 0.2f, 0.2f, 1f);
+        buttonDownTexture = createColoredTexture(1, 1, 0.35f, 0.35f, 0.35f, 1f);
+        TextureRegionDrawable upDrawable = new TextureRegionDrawable(new TextureRegion(buttonUpTexture));
+        TextureRegionDrawable downDrawable = new TextureRegionDrawable(new TextureRegion(buttonDownTexture));
+
+        com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle style = new com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle();
+        style.up = upDrawable;
+        style.down = downDrawable;
+        style.font = font;
+        uiSkin.add("default", style);
+
+        // Overlay for pause background
+        overlayTexture = createColoredTexture(1, 1, 0f, 0f, 0f, 0.5f);
+        overlayImage = new Image(new TextureRegionDrawable(new TextureRegion(overlayTexture)));
+        overlayImage.setFillParent(true);
+        overlayImage.setVisible(false);
+        stage.addActor(overlayImage);
+    }
+
+    private Texture createColoredTexture(int width, int height, float r, float g, float b, float a) {
+        Pixmap pixmap = new Pixmap(width, height, Pixmap.Format.RGBA8888);
+        pixmap.setColor(r, g, b, a);
+        pixmap.fill();
+        Texture texture = new Texture(pixmap);
+        pixmap.dispose();
+        return texture;
+    }
+
+    private void createPauseControls() {
+        pauseButton = new TextButton("Pause", uiSkin);
+        pauseButton.setSize(160, 70);
+        pauseButton.setPosition(Gdx.graphics.getWidth() - pauseButton.getWidth() - 20, Gdx.graphics.getHeight() - pauseButton.getHeight() - 20);
+        pauseButton.addListener(new InputListener() {
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                setPaused(true);
+                return true;
+            }
+        });
+        stage.addActor(pauseButton);
+
+        pauseMenuGroup = new Group();
+        pauseMenuGroup.setVisible(false);
+
+        resumeButton = new TextButton("Resume", uiSkin);
+        resumeButton.setSize(240, 80);
+        quitButton = new TextButton("Quit", uiSkin);
+        quitButton.setSize(240, 80);
+
+        float centerX = Gdx.graphics.getWidth() / 2f;
+        float centerY = Gdx.graphics.getHeight() / 2f;
+        resumeButton.setPosition(centerX - resumeButton.getWidth() / 2f, centerY + 50);
+        quitButton.setPosition(centerX - quitButton.getWidth() / 2f, centerY - 50 - quitButton.getHeight());
+
+        resumeButton.addListener(new InputListener() {
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                setPaused(false);
+                return true;
+            }
+        });
+
+        quitButton.addListener(new InputListener() {
+            @Override
+            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
+                // Return to main menu
+                game.setScreen(new MainMenuScreen(game));
+                return true;
+            }
+        });
+
+        pauseMenuGroup.addActor(resumeButton);
+        pauseMenuGroup.addActor(quitButton);
+        stage.addActor(pauseMenuGroup);
+    }
+
+    private void setPaused(boolean paused) {
+        isPaused = paused;
+        overlayImage.setVisible(paused);
+        pauseMenuGroup.setVisible(paused);
+        leftButton.setDisabled(paused);
+        rightButton.setDisabled(paused);
+        jumpButton.setDisabled(paused);
+    }
+
     @Override
     public void show() {
 
@@ -155,12 +263,14 @@ public class GameScreen implements Screen {
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Step the physics world
-        world.step(1 / 60f, 6, 2);
+        // Step the physics world only when not paused
+        if (!isPaused) {
+            world.step(1 / 60f, 6, 2);
 
-        // Update player movement
-        inputHandler.updateMovement();
-        player.updateMovement(inputHandler.moveLeft, inputHandler.moveRight);
+            // Update player movement
+            inputHandler.updateMovement();
+            player.updateMovement(inputHandler.moveLeft, inputHandler.moveRight);
+        }
 
         // Respawn player if falling
         if (player.isFalling()) {
@@ -213,8 +323,16 @@ public class GameScreen implements Screen {
         backgroundTexture.dispose();
         platformTexture.dispose();
         player.getTexture().dispose();
+        leftTexture.dispose();
+        rightTexture.dispose();
+        jumpTexture.dispose();
+        inputHandler.dispose();
         world.dispose();
         debugRenderer.dispose();
         stage.dispose();
+        if (uiSkin != null) uiSkin.dispose();
+        if (buttonUpTexture != null) buttonUpTexture.dispose();
+        if (buttonDownTexture != null) buttonDownTexture.dispose();
+        if (overlayTexture != null) overlayTexture.dispose();
     }
 }

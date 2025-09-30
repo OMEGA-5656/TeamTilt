@@ -3,10 +3,8 @@ package com.newgame.teamtilt;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.g2d.Batch;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.GlyphLayout;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.Color;
@@ -15,7 +13,6 @@ public class MainMenuScreen implements Screen {
     final TeamTiltMain game;
     private BitmapFont titleFont, smallFont, buttonFont;
     private GlyphLayout layoutTitle, layoutSmall, layoutButton;
-    private SpriteBatch batch;
     private ShapeRenderer shapeRenderer;
 
     // Button dimensions
@@ -23,7 +20,6 @@ public class MainMenuScreen implements Screen {
 
     public MainMenuScreen(final TeamTiltMain game) {
         this.game = game;
-        batch = new SpriteBatch();
         shapeRenderer = new ShapeRenderer();
         layoutTitle = new GlyphLayout();
         layoutSmall = new GlyphLayout();
@@ -110,13 +106,13 @@ public class MainMenuScreen implements Screen {
         // Reset line width
         Gdx.gl.glLineWidth(1);
         // Draw text
-        batch.begin();
-        titleFont.draw(batch, titleText, titleX, titleY);
-        smallFont.draw(batch, startText, centerX - layoutSmall.width / 2, titleY - textHeight - 40);
+        game.batch.begin();
+        titleFont.draw(game.batch, titleText, titleX, titleY);
+        smallFont.draw(game.batch, startText, centerX - layoutSmall.width / 2, titleY - textHeight - 40);
 
         // Draw "ONLINE" text in white, centered on the button
-        buttonFont.draw(batch, "ONLINE", buttonX + (buttonWidth - layoutButton.width) / 2, buttonY - (buttonHeight - layoutButton.height) / 2);
-        batch.end();
+        buttonFont.draw(game.batch, "ONLINE", buttonX + (buttonWidth - layoutButton.width) / 2, buttonY - (buttonHeight - layoutButton.height) / 2);
+        game.batch.end();
 
         // Check touch events
         if (Gdx.input.justTouched()) {
@@ -156,7 +152,6 @@ public class MainMenuScreen implements Screen {
         titleFont.dispose();
         smallFont.dispose();
         buttonFont.dispose();
-        batch.dispose();
         shapeRenderer.dispose();
     }
 }

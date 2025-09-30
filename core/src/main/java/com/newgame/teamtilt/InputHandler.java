@@ -13,7 +13,7 @@ public class InputHandler implements InputProcessor {
     boolean moveRight = false;
     private boolean isGrounded = false;
 
-    Sound jump_sound = Gdx.audio.newSound(Gdx.files.internal("sounds/jump_sound.wav"));
+    private final Sound jumpSound = Gdx.audio.newSound(Gdx.files.internal("sounds/jump_sound.wav"));
     public InputHandler(Body playerBody, float speed) {
         this.playerBody = playerBody;
         this.speed = speed;
@@ -22,9 +22,11 @@ public class InputHandler implements InputProcessor {
     public void updateMovement() {
         if (moveLeft) {
             playerBody.setLinearVelocity(-speed, playerBody.getLinearVelocity().y);
-        }
-        if (moveRight) {
+        } else if (moveRight) {
             playerBody.setLinearVelocity(speed, playerBody.getLinearVelocity().y);
+        } else {
+            // stop horizontal movement when no input
+            playerBody.setLinearVelocity(0f, playerBody.getLinearVelocity().y);
         }
     }
 
@@ -32,8 +34,7 @@ public class InputHandler implements InputProcessor {
         if (isGrounded) {
             playerBody.applyLinearImpulse(new Vector2(0, 2f), playerBody.getWorldCenter(), true);
             isGrounded = false;
-            jump_sound.play();
-            System.out.println("Played jump sound!");
+            jumpSound.play();
         }
     }
 
@@ -104,5 +105,9 @@ public class InputHandler implements InputProcessor {
 
     public void moveRight() {
         moveRight = true;
+    }
+
+    public void dispose() {
+        jumpSound.dispose();
     }
 }
