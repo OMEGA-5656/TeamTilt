@@ -20,18 +20,19 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.newgame.teamtilt.levels.LevelDefinition;
 
 public class GameScreen implements Screen {
     final TeamTiltMain game;
     private Texture backgroundTexture;
     private Texture platformTexture;
     private Texture leftTexture, rightTexture, jumpTexture;
-    private Texture buttonUpTexture, buttonDownTexture, overlayTexture;
+    private Texture pauseIconTexture, resumeIconTexture, sidebarBgTexture;
     private Stage stage;
     private ImageButton leftButton, rightButton, jumpButton;
-    private TextButton pauseButton, resumeButton, quitButton;
-    private Image overlayImage;
-    private Group pauseMenuGroup;
+    private ImageButton pauseIconButton;
+    private TextButton quitButton;
+    private Group sidebarGroup;
     private Skin uiSkin;
     private boolean isPaused = false;
     // Movement and grounded state handled by InputHandler
@@ -46,9 +47,15 @@ public class GameScreen implements Screen {
     // Player instance
     private Player player;
     private InputHandler inputHandler;
+    private LevelDefinition levelDefinition;
 
     public GameScreen(final TeamTiltMain game) {
+        this(game, null);
+    }
+
+    public GameScreen(final TeamTiltMain game, LevelDefinition levelDefinition) {
         this.game = game;
+        this.levelDefinition = levelDefinition;
 
         // Load textures
         backgroundTexture = new Texture(Gdx.files.internal("backgrounds/background.png"));
@@ -96,14 +103,19 @@ public class GameScreen implements Screen {
 
         // Initialize pause UI
         setupUiSkin();
-        createPauseControls();
+        createPauseUI();
 
-        // Add platforms using the new Platform class
-        platforms.add(new Platform(world, 100, 100, PLATFORM_WIDTH, PLATFORM_HEIGHT));
-        platforms.add(new Platform(world, 400, 120, PLATFORM_WIDTH, PLATFORM_HEIGHT));
-        platforms.add(new Platform(world, 700, 170, PLATFORM_WIDTH, PLATFORM_HEIGHT));
-        platforms.add(new Platform(world, 400, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
-        platforms.add(new Platform(world, 50, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+        // Build platforms from level definition if provided
+        if (this.levelDefinition != null) {
+            this.levelDefinition.build(world, platforms);
+        } else {
+            // default layout if none provided
+            platforms.add(new Platform(world, 100, 100, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+            platforms.add(new Platform(world, 400, 120, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+            platforms.add(new Platform(world, 700, 170, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+            platforms.add(new Platform(world, 400, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+            platforms.add(new Platform(world, 50, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
+        }
     }
 
     private void createTouchControls() {
@@ -167,24 +179,13 @@ public class GameScreen implements Screen {
         font.getData().setScale(2f);
         uiSkin.add("default-font", font, BitmapFont.class);
 
-        // Create simple colored textures for button states
-        buttonUpTexture = createColoredTexture(1, 1, 0.2f, 0.2f, 0.2f, 1f);
-        buttonDownTexture = createColoredTexture(1, 1, 0.35f, 0.35f, 0.35f, 1f);
-        TextureRegionDrawable upDrawable = new TextureRegionDrawable(new TextureRegion(buttonUpTexture));
-        TextureRegionDrawable downDrawable = new TextureRegionDrawable(new TextureRegion(buttonDownTexture));
-
+        Texture buttonUp = createColoredTexture(1, 1, 0.2f, 0.2f, 0.2f, 1f);
+        Texture buttonDown = createColoredTexture(1, 1, 0.35f, 0.35f, 0.35f, 1f);
         com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle style = new com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle();
-        style.up = upDrawable;
-        style.down = downDrawable;
+        style.up = new TextureRegionDrawable(new TextureRegion(buttonUp));
+        style.down = new TextureRegionDrawable(new TextureRegion(buttonDown));
         style.font = font;
         uiSkin.add("default", style);
-
-        // Overlay for pause background
-        overlayTexture = createColoredTexture(1, 1, 0f, 0f, 0f, 0.5f);
-        overlayImage = new Image(new TextureRegionDrawable(new TextureRegion(overlayTexture)));
-        overlayImage.setFillParent(true);
-        overlayImage.setVisible(false);
-        stage.addActor(overlayImage);
     }
 
     private Texture createColoredTexture(int width, int height, float r, float g, float b, float a) {
@@ -196,58 +197,105 @@ public class GameScreen implements Screen {
         return texture;
     }
 
-    private void createPauseControls() {
-        pauseButton = new TextButton("Pause", uiSkin);
-        pauseButton.setSize(160, 70);
-        pauseButton.setPosition(Gdx.graphics.getWidth() - pauseButton.getWidth() - 20, Gdx.graphics.getHeight() - pauseButton.getHeight() - 20);
-        pauseButton.addListener(new InputListener() {
+    private Texture createPauseIconTexture(int width, int height, float r, float g, float b, float a) {
+        Pixmap pixmap = new Pixmap(width, height, Pixmap.Format.RGBA8888);
+        pixmap.setColor(0f, 0f, 0f, 0f);
+        pixmap.fill();
+        pixmap.setColor(r, g, b, a);
+        int barWidth = Math.max(8, width / 5);
+        int gap = barWidth; // gap between bars
+        int barHeight = (int)(height * 0.75f);
+        int y = (height - barHeight) / 2;
+        int x1 = (width - (2 * barWidth + gap)) / 2;
+        int x2 = x1 + barWidth + gap;
+        pixmap.fillRectangle(x1, y, barWidth, barHeight);
+        pixmap.fillRectangle(x2, y, barWidth, barHeight);
+        Texture texture = new Texture(pixmap);
+        pixmap.dispose();
+        return texture;
+    }
+
+    private Texture createResumeIconTexture(int width, int height, float r, float g, float b, float a) {
+        Pixmap pixmap = new Pixmap(width, height, Pixmap.Format.RGBA8888);
+        pixmap.setColor(0f, 0f, 0f, 0f);
+        pixmap.fill();
+        pixmap.setColor(r, g, b, a);
+        int triangleWidth = (int)(width * 0.45f);
+        int triangleHeight = (int)(height * 0.55f);
+        int x = (width - triangleWidth) / 2;
+        int y = (height - triangleHeight) / 2;
+        // Right-pointing triangle
+        for (int i = 0; i < triangleWidth; i++) {
+            int offset = (triangleHeight * i) / triangleWidth / 2;
+            int startY = y + offset;
+            int endY = y + triangleHeight - offset;
+            pixmap.drawLine(x + i, startY, x + i, endY);
+        }
+        Texture texture = new Texture(pixmap);
+        pixmap.dispose();
+        return texture;
+    }
+
+    private void createPauseUI() {
+        // Create translucent grey pause and resume icons
+        pauseIconTexture = createPauseIconTexture(80, 80, 0.6f, 0.6f, 0.6f, 0.6f);
+        resumeIconTexture = createResumeIconTexture(80, 80, 0.6f, 0.6f, 0.6f, 0.6f);
+        pauseIconButton = new ImageButton(new TextureRegionDrawable(new TextureRegion(pauseIconTexture)));
+        pauseIconButton.setSize(80, 80);
+        pauseIconButton.setPosition(20, Gdx.graphics.getHeight() - pauseIconButton.getHeight() - 20);
+        pauseIconButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                setPaused(true);
+                setPaused(!isPaused);
                 return true;
             }
         });
-        stage.addActor(pauseButton);
+        stage.addActor(pauseIconButton);
 
-        pauseMenuGroup = new Group();
-        pauseMenuGroup.setVisible(false);
+        // Sidebar group
+        sidebarGroup = new Group();
+        float sidebarWidth = Math.max(260, Gdx.graphics.getWidth() * 0.35f);
+        sidebarBgTexture = createColoredTexture(1, 1, 0f, 0f, 0f, 0.6f);
+        Image sidebarBg = new Image(new TextureRegionDrawable(new TextureRegion(sidebarBgTexture)));
+        sidebarBg.setSize(sidebarWidth, Gdx.graphics.getHeight());
+        sidebarGroup.addActor(sidebarBg);
 
-        resumeButton = new TextButton("Resume", uiSkin);
-        resumeButton.setSize(240, 80);
         quitButton = new TextButton("Quit", uiSkin);
-        quitButton.setSize(240, 80);
-
-        float centerX = Gdx.graphics.getWidth() / 2f;
-        float centerY = Gdx.graphics.getHeight() / 2f;
-        resumeButton.setPosition(centerX - resumeButton.getWidth() / 2f, centerY + 50);
-        quitButton.setPosition(centerX - quitButton.getWidth() / 2f, centerY - 50 - quitButton.getHeight());
-
-        resumeButton.addListener(new InputListener() {
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                setPaused(false);
-                return true;
-            }
-        });
-
+        quitButton.setSize(200, 80);
+        quitButton.setPosition((sidebarWidth - quitButton.getWidth()) / 2f, Gdx.graphics.getHeight() - 200);
         quitButton.addListener(new InputListener() {
             @Override
             public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                // Return to main menu
                 game.setScreen(new MainMenuScreen(game));
+                dispose();
                 return true;
             }
         });
+        sidebarGroup.addActor(quitButton);
 
-        pauseMenuGroup.addActor(resumeButton);
-        pauseMenuGroup.addActor(quitButton);
-        stage.addActor(pauseMenuGroup);
+        // Start hidden just off-screen to the left
+        sidebarGroup.setPosition(-sidebarWidth, 0);
+        stage.addActor(sidebarGroup);
+        // Keep pause/resume icon above the sidebar so it stays clickable
+        pauseIconButton.toFront();
     }
 
     private void setPaused(boolean paused) {
         isPaused = paused;
-        overlayImage.setVisible(paused);
-        pauseMenuGroup.setVisible(paused);
+        float sidebarWidth = sidebarGroup.getChildren().first().getWidth();
+        if (paused) {
+            sidebarGroup.setX(0);
+            // switch to resume icon when paused
+            pauseIconButton.getStyle().imageUp = new TextureRegionDrawable(new TextureRegion(resumeIconTexture));
+            pauseIconButton.invalidate();
+            pauseIconButton.toFront();
+        } else {
+            sidebarGroup.setX(-sidebarWidth);
+            // switch back to pause icon when resumed
+            pauseIconButton.getStyle().imageUp = new TextureRegionDrawable(new TextureRegion(pauseIconTexture));
+            pauseIconButton.invalidate();
+            pauseIconButton.toFront();
+        }
         leftButton.setDisabled(paused);
         rightButton.setDisabled(paused);
         jumpButton.setDisabled(paused);
@@ -331,8 +379,7 @@ public class GameScreen implements Screen {
         debugRenderer.dispose();
         stage.dispose();
         if (uiSkin != null) uiSkin.dispose();
-        if (buttonUpTexture != null) buttonUpTexture.dispose();
-        if (buttonDownTexture != null) buttonDownTexture.dispose();
-        if (overlayTexture != null) overlayTexture.dispose();
+        if (pauseIconTexture != null) pauseIconTexture.dispose();
+        if (sidebarBgTexture != null) sidebarBgTexture.dispose();
     }
 }

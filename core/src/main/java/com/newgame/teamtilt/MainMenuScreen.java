@@ -124,7 +124,8 @@ public class MainMenuScreen implements Screen {
             float startY = titleY - textHeight - 40;
             if (touchX >= startX && touchX <= startX + layoutSmall.width &&
                 touchY >= startY - layoutSmall.height && touchY <= startY) {
-                game.setScreen(new GameScreen(game));
+                game.setScreen(new WorldsScreen(game));
+                dispose();
             }
 
             // Check if "ONLINE" button is clicked
