@@ -21,6 +21,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.newgame.teamtilt.levels.LevelDefinition;
+import com.newgame.teamtilt.levels.LevelProgress;
 
 public class GameScreen implements Screen {
     final TeamTiltMain game;
@@ -48,6 +49,12 @@ public class GameScreen implements Screen {
     private Player player;
     private InputHandler inputHandler;
     private LevelDefinition levelDefinition;
+    private Texture doorTexture;
+    private float doorX, doorY, doorWidth = 40f, doorHeight = 80f;
+    private boolean levelComplete = false;
+    private int currentWorldIndex = 1;
+    private int currentLevelIndex = 1;
+    private boolean exiting = false;
 
     public GameScreen(final TeamTiltMain game) {
         this(game, null);
@@ -56,6 +63,13 @@ public class GameScreen implements Screen {
     public GameScreen(final TeamTiltMain game, LevelDefinition levelDefinition) {
         this.game = game;
         this.levelDefinition = levelDefinition;
+    }
+
+    public GameScreen(final TeamTiltMain game, LevelDefinition levelDefinition, int worldIndex, int levelIndex) {
+        this.game = game;
+        this.levelDefinition = levelDefinition;
+        this.currentWorldIndex = worldIndex;
+        this.currentLevelIndex = levelIndex;
 
         // Load textures
         backgroundTexture = new Texture(Gdx.files.internal("backgrounds/background.png"));
@@ -116,6 +130,21 @@ public class GameScreen implements Screen {
             platforms.add(new Platform(world, 400, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
             platforms.add(new Platform(world, 50, 240, PLATFORM_WIDTH, PLATFORM_HEIGHT));
         }
+
+        // Compute a simple door placement: to the right of the right-most platform
+        float maxX = 0f;
+        float baseY = 0f;
+        for (Platform p : platforms) {
+            Vector2 pos = p.getPosition();
+            float px = (pos.x * player.getPPM());
+            if (px > maxX) {
+                maxX = px;
+                baseY = (pos.y * player.getPPM());
+            }
+        }
+        doorX = maxX + (PLATFORM_WIDTH / 2f) + 20f;
+        doorY = baseY + (PLATFORM_HEIGHT / 2f);
+        doorTexture = createColoredTexture(1, 1, 0f, 0f, 0f, 1f);
     }
 
     private void createTouchControls() {
@@ -311,13 +340,41 @@ public class GameScreen implements Screen {
         Gdx.gl.glClearColor(1, 1, 1, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Step the physics world only when not paused
-        if (!isPaused) {
+        // Step the physics world only when not paused and not exiting
+        if (!isPaused && !exiting) {
             world.step(1 / 60f, 6, 2);
 
             // Update player movement
             inputHandler.updateMovement();
             player.updateMovement(inputHandler.moveLeft, inputHandler.moveRight);
+
+            // Check door overlap (AABB) when not complete
+            if (!levelComplete) {
+                float px = player.getBody().getPosition().x * player.getPPM();
+                float py = player.getBody().getPosition().y * player.getPPM();
+                float pw = player.getTexture().getWidth();
+                float ph = player.getTexture().getHeight();
+                boolean overlap = px + pw/2 > doorX && px - pw/2 < doorX + doorWidth &&
+                                   py + ph/2 > doorY && py - ph/2 < doorY + doorHeight;
+                if (overlap) {
+                    levelComplete = true;
+                    // Despawn player by moving off-screen and stopping movement
+                    player.getBody().setLinearVelocity(0, 0);
+                    player.getBody().setTransform(-1000f, -1000f, 0);
+                    // Schedule navigation after this frame to avoid rendering/dispose races
+                    if (!exiting) {
+                        exiting = true;
+                        LevelProgress.markCompleted(currentWorldIndex, currentLevelIndex);
+                        Gdx.app.postRunnable(new Runnable() {
+                            @Override
+                            public void run() {
+                                game.setScreen(new LevelsScreen(game, currentWorldIndex));
+                                dispose();
+                            }
+                        });
+                    }
+                }
+            }
         }
 
         // Respawn player if falling
@@ -338,14 +395,21 @@ public class GameScreen implements Screen {
         }
 
         // Draw the player
-        game.batch.draw(player.getTexture(),
-            player.getBody().getPosition().x * player.getPPM() - player.getTexture().getWidth() / 2,
-            player.getBody().getPosition().y * player.getPPM() - player.getTexture().getHeight() / 2);
+        if (!levelComplete) {
+            game.batch.draw(player.getTexture(),
+                player.getBody().getPosition().x * player.getPPM() - player.getTexture().getWidth() / 2,
+                player.getBody().getPosition().y * player.getPPM() - player.getTexture().getHeight() / 2);
+        }
+
+        // Draw the door
+        game.batch.draw(doorTexture, doorX, doorY, doorWidth, doorHeight);
 
         game.batch.end();
 
         // Debug render (optional)
-        debugRenderer.render(world, game.batch.getProjectionMatrix().cpy().scale(player.getPPM(), player.getPPM(), 0));
+        if (!exiting) {
+            debugRenderer.render(world, game.batch.getProjectionMatrix().cpy().scale(player.getPPM(), player.getPPM(), 0));
+        }
 
         // Draw the UI buttons
         stage.act(delta);
@@ -380,6 +444,7 @@ public class GameScreen implements Screen {
         stage.dispose();
         if (uiSkin != null) uiSkin.dispose();
         if (pauseIconTexture != null) pauseIconTexture.dispose();
+        if (doorTexture != null) doorTexture.dispose();
         if (sidebarBgTexture != null) sidebarBgTexture.dispose();
     }
 }

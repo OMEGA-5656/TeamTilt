@@ -19,6 +19,8 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.newgame.teamtilt.levels.LevelDefinition;
 import com.newgame.teamtilt.levels.LevelFactory;
+import com.newgame.teamtilt.levels.LevelProgress;
+import com.badlogic.gdx.graphics.Color;
 
 public class LevelsScreen implements Screen {
     private final TeamTiltMain game;
@@ -26,6 +28,7 @@ public class LevelsScreen implements Screen {
     private final Stage stage;
     private final Skin skin;
     private Texture backIconTexture;
+    private Texture greenUpTexture, greenDownTexture;
 
     public LevelsScreen(TeamTiltMain game, int worldIndex) {
         this.game = game;
@@ -44,6 +47,9 @@ public class LevelsScreen implements Screen {
 
         Texture up = makeTex(1,1, 0.2f,0.2f,0.2f,1f);
         Texture down = makeTex(1,1, 0.35f,0.35f,0.35f,1f);
+        // Precreate green styles for completed levels
+        greenUpTexture = makeTex(1,1, 0.2f,0.6f,0.2f,1f);
+        greenDownTexture = makeTex(1,1, 0.25f,0.7f,0.25f,1f);
         TextButton.TextButtonStyle tbs = new TextButton.TextButtonStyle();
         tbs.up = new TextureRegionDrawable(new TextureRegion(up));
         tbs.down = new TextureRegionDrawable(new TextureRegion(down));
@@ -82,11 +88,19 @@ public class LevelsScreen implements Screen {
             for (int c = 0; c < cols; c++) {
                 final int levelIndex = level;
                 TextButton btn = new TextButton("Level " + level, skin);
+                // Ensure each button has its own style instance to avoid mutating the shared Skin style
+                TextButton.TextButtonStyle styleCopy = new TextButton.TextButtonStyle(skin.get(TextButton.TextButtonStyle.class));
+                if (LevelProgress.isCompleted(worldIndex, levelIndex)) {
+                    btn.getLabel().setColor(Color.WHITE);
+                    styleCopy.up = new TextureRegionDrawable(new TextureRegion(greenUpTexture));
+                    styleCopy.down = new TextureRegionDrawable(new TextureRegion(greenDownTexture));
+                }
+                btn.setStyle(styleCopy);
                 btn.addListener(new InputListener(){
                     @Override
                     public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                         LevelDefinition def = LevelFactory.getLevel(worldIndex, levelIndex);
-                        game.setScreen(new GameScreen(game, def));
+                        game.setScreen(new GameScreen(game, def, worldIndex, levelIndex));
                         dispose();
                         return true;
                     }
@@ -133,6 +147,8 @@ public class LevelsScreen implements Screen {
         stage.dispose();
         skin.dispose();
         if (backIconTexture != null) backIconTexture.dispose();
+        if (greenUpTexture != null) greenUpTexture.dispose();
+        if (greenDownTexture != null) greenDownTexture.dispose();
     }
 
     // Local helper to generate chevron '<' icon
