@@ -15,4 +15,10 @@ public class AndroidLauncher extends AndroidApplication {
         configuration.useImmersiveMode = true; // Recommended, but not required.
         initialize(new TeamTiltMain(), configuration);
     }
+
+    @Override
+    public void onBackPressed() {
+        // Let LibGDX handle the back button instead of closing the app
+        // The individual screens will handle navigation
+    }
 }

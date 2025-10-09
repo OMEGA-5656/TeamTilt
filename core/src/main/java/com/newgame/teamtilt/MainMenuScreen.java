@@ -8,8 +8,9 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.InputProcessor;
 
-public class MainMenuScreen implements Screen {
+public class MainMenuScreen implements Screen, InputProcessor {
     final TeamTiltMain game;
     private BitmapFont titleFont, smallFont, buttonFont;
     private GlyphLayout layoutTitle, layoutSmall, layoutButton;
@@ -51,6 +52,10 @@ public class MainMenuScreen implements Screen {
         buttonHeight = layoutButton.height + 20;
         buttonX = Gdx.graphics.getWidth() - buttonWidth - 30;
         buttonY = Gdx.graphics.getHeight() - 30; // Keep padding from the top
+        
+        // Set this screen as the input processor for back button handling
+        Gdx.input.setCatchBackKey(true);
+        Gdx.input.setInputProcessor(this);
     }
 
     @Override
@@ -154,5 +159,57 @@ public class MainMenuScreen implements Screen {
         smallFont.dispose();
         buttonFont.dispose();
         shapeRenderer.dispose();
+    }
+
+    // InputProcessor methods for back button handling
+    @Override
+    public boolean keyDown(int keycode) {
+        // Android back button is keycode 131 (Input.Keys.BACK)
+        if (keycode == 131) {
+            // From main menu, allow exit
+            Gdx.app.exit();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean keyUp(int keycode) {
+        return false;
+    }
+
+    @Override
+    public boolean keyTyped(char character) {
+        return false;
+    }
+
+    @Override
+    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean touchCancelled(int screenX, int screenY, int pointer, int button) {
+        return false;
+    }
+
+    @Override
+    public boolean touchDragged(int screenX, int screenY, int pointer) {
+        return false;
+    }
+
+    @Override
+    public boolean mouseMoved(int screenX, int screenY) {
+        return false;
+    }
+
+    @Override
+    public boolean scrolled(float amountX, float amountY) {
+        return false;
     }
 }

@@ -22,8 +22,9 @@ import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.newgame.teamtilt.levels.LevelDefinition;
 import com.newgame.teamtilt.levels.LevelProgress;
+import com.badlogic.gdx.InputProcessor;
 
-public class GameScreen implements Screen {
+public class GameScreen implements Screen, InputProcessor {
     final TeamTiltMain game;
     private Texture backgroundTexture;
     private Texture platformTexture;
@@ -113,7 +114,9 @@ public class GameScreen implements Screen {
         // Initialize stage and touch controls
         stage = new Stage(new ScreenViewport());
         createTouchControls();
-        Gdx.input.setInputProcessor(stage);
+        // Set this screen as the input processor for back button handling
+        Gdx.input.setCatchBackKey(true);
+        Gdx.input.setInputProcessor(this);
 
         // Initialize pause UI
         setupUiSkin();
@@ -446,5 +449,59 @@ public class GameScreen implements Screen {
         if (pauseIconTexture != null) pauseIconTexture.dispose();
         if (doorTexture != null) doorTexture.dispose();
         if (sidebarBgTexture != null) sidebarBgTexture.dispose();
+    }
+
+    // InputProcessor methods for back button handling
+    @Override
+    public boolean keyDown(int keycode) {
+        // Android back button is keycode 131 (Input.Keys.BACK)
+        if (keycode == 131) {
+            // From GameScreen, go to LevelsScreen for the current world
+            game.setScreen(new LevelsScreen(game, currentWorldIndex));
+            dispose();
+            return true;
+        }
+        // Let stage handle other inputs
+        return stage.keyDown(keycode);
+    }
+
+    @Override
+    public boolean keyUp(int keycode) {
+        return stage.keyUp(keycode);
+    }
+
+    @Override
+    public boolean keyTyped(char character) {
+        return stage.keyTyped(character);
+    }
+
+    @Override
+    public boolean touchDown(int screenX, int screenY, int pointer, int button) {
+        return stage.touchDown(screenX, screenY, pointer, button);
+    }
+
+    @Override
+    public boolean touchUp(int screenX, int screenY, int pointer, int button) {
+        return stage.touchUp(screenX, screenY, pointer, button);
+    }
+
+    @Override
+    public boolean touchCancelled(int screenX, int screenY, int pointer, int button) {
+        return stage.touchCancelled(screenX, screenY, pointer, button);
+    }
+
+    @Override
+    public boolean touchDragged(int screenX, int screenY, int pointer) {
+        return stage.touchDragged(screenX, screenY, pointer);
+    }
+
+    @Override
+    public boolean mouseMoved(int screenX, int screenY) {
+        return stage.mouseMoved(screenX, screenY);
+    }
+
+    @Override
+    public boolean scrolled(float amountX, float amountY) {
+        return stage.scrolled(amountX, amountY);
     }
 }
