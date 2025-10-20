@@ -10,6 +10,7 @@ import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.InputListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.Group;
@@ -22,6 +23,9 @@ import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.newgame.teamtilt.levels.LevelDefinition;
 import com.newgame.teamtilt.levels.LevelProgress;
+import com.newgame.teamtilt.multiplayer.MultiplayerManager;
+import com.newgame.teamtilt.multiplayer.MultiplayerService;
+import com.newgame.teamtilt.ui.ToastManager;
 import com.badlogic.gdx.InputProcessor;
 
 public class GameScreen implements Screen, InputProcessor {
@@ -56,6 +60,12 @@ public class GameScreen implements Screen, InputProcessor {
     private int currentWorldIndex = 1;
     private int currentLevelIndex = 1;
     private boolean exiting = false;
+    
+    // Multiplayer support
+    private MultiplayerManager multiplayerManager;
+    private Array<Player> remotePlayers = new Array<>();
+    private Texture remotePlayerTexture;
+    private ToastManager toastManager;
 
     public GameScreen(final TeamTiltMain game) {
         this(game, null);
@@ -67,10 +77,25 @@ public class GameScreen implements Screen, InputProcessor {
     }
 
     public GameScreen(final TeamTiltMain game, LevelDefinition levelDefinition, int worldIndex, int levelIndex) {
+        this(game, levelDefinition, worldIndex, levelIndex, null);
+    }
+
+    public GameScreen(final TeamTiltMain game, LevelDefinition levelDefinition, int worldIndex, int levelIndex, MultiplayerManager multiplayerManager) {
         this.game = game;
         this.levelDefinition = levelDefinition;
         this.currentWorldIndex = worldIndex;
         this.currentLevelIndex = levelIndex;
+        this.multiplayerManager = multiplayerManager;
+
+        // Initialize multiplayer (will be null if not available)
+        try {
+            // This will be set by the calling code based on platform
+            if (multiplayerManager == null) {
+                multiplayerManager = null; // Will be injected later
+            }
+        } catch (Exception e) {
+            Gdx.app.log("GameScreen", "Multiplayer not available: " + e.getMessage());
+        }
 
         // Load textures
         backgroundTexture = new Texture(Gdx.files.internal("backgrounds/background.png"));
@@ -121,6 +146,12 @@ public class GameScreen implements Screen, InputProcessor {
         // Initialize pause UI
         setupUiSkin();
         createPauseUI();
+        
+        // Load remote player texture
+        remotePlayerTexture = new Texture(Gdx.files.internal("characters/character.png"));
+        
+        // Initialize toast manager
+        toastManager = new ToastManager();
 
         // Build platforms from level definition if provided
         if (this.levelDefinition != null) {
@@ -213,11 +244,16 @@ public class GameScreen implements Screen, InputProcessor {
 
         Texture buttonUp = createColoredTexture(1, 1, 0.2f, 0.2f, 0.2f, 1f);
         Texture buttonDown = createColoredTexture(1, 1, 0.35f, 0.35f, 0.35f, 1f);
-        com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle style = new com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle();
-        style.up = new TextureRegionDrawable(new TextureRegion(buttonUp));
-        style.down = new TextureRegionDrawable(new TextureRegion(buttonDown));
-        style.font = font;
-        uiSkin.add("default", style);
+        com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle buttonStyle = new com.badlogic.gdx.scenes.scene2d.ui.TextButton.TextButtonStyle();
+        buttonStyle.up = new TextureRegionDrawable(new TextureRegion(buttonUp));
+        buttonStyle.down = new TextureRegionDrawable(new TextureRegion(buttonDown));
+        buttonStyle.font = font;
+        uiSkin.add("default", buttonStyle);
+        
+        // Add LabelStyle for room code display
+        com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle labelStyle = new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle();
+        labelStyle.font = font;
+        uiSkin.add("default", labelStyle);
     }
 
     private Texture createColoredTexture(int width, int height, float r, float g, float b, float a) {
@@ -292,6 +328,18 @@ public class GameScreen implements Screen, InputProcessor {
         sidebarBg.setSize(sidebarWidth, Gdx.graphics.getHeight());
         sidebarGroup.addActor(sidebarBg);
 
+        // Room code display (only for host)
+        if (multiplayerManager != null && multiplayerManager.isHost()) {
+            String roomCode = multiplayerManager.getCurrentRoomCode();
+            if (roomCode != null) {
+                Label roomCodeLabel = new Label("Room Code:\n" + roomCode, uiSkin);
+                roomCodeLabel.setSize(sidebarWidth - 40, 100);
+                roomCodeLabel.setPosition(20, Gdx.graphics.getHeight() - 300);
+                roomCodeLabel.setAlignment(1); // Center alignment
+                sidebarGroup.addActor(roomCodeLabel);
+            }
+        }
+
         quitButton = new TextButton("Quit", uiSkin);
         quitButton.setSize(200, 80);
         quitButton.setPosition((sidebarWidth - quitButton.getWidth()) / 2f, Gdx.graphics.getHeight() - 200);
@@ -310,6 +358,37 @@ public class GameScreen implements Screen, InputProcessor {
         stage.addActor(sidebarGroup);
         // Keep pause/resume icon above the sidebar so it stays clickable
         pauseIconButton.toFront();
+    }
+    
+    /**
+     * Set the multiplayer manager for this game session
+     */
+    public void setMultiplayerManager(MultiplayerManager multiplayerManager) {
+        this.multiplayerManager = multiplayerManager;
+        if (multiplayerManager != null) {
+            // Create remote players for existing multiplayer players
+            updateRemotePlayers();
+        }
+    }
+    
+    /**
+     * Update remote players based on multiplayer state
+     */
+    private void updateRemotePlayers() {
+        if (multiplayerManager == null) return;
+        
+        // Remove existing remote players
+        for (Player remotePlayer : remotePlayers) {
+            world.destroyBody(remotePlayer.getBody());
+        }
+        remotePlayers.clear();
+        
+        // Create new remote players
+        Array<MultiplayerManager.MultiplayerPlayer> multiplayerPlayers = multiplayerManager.getRemotePlayers();
+        for (MultiplayerManager.MultiplayerPlayer mpPlayer : multiplayerPlayers) {
+            Player remotePlayer = new Player(world, remotePlayerTexture, mpPlayer.getId());
+            remotePlayers.add(remotePlayer);
+        }
     }
 
     private void setPaused(boolean paused) {
@@ -350,6 +429,33 @@ public class GameScreen implements Screen, InputProcessor {
             // Update player movement
             inputHandler.updateMovement();
             player.updateMovement(inputHandler.moveLeft, inputHandler.moveRight);
+            
+            // Multiplayer synchronization
+            if (multiplayerManager != null && multiplayerManager.isMultiplayerActive()) {
+                // Send local player data to other players
+                MultiplayerService.PlayerData playerData = player.getPlayerData();
+                multiplayerManager.updatePlayerData(
+                    playerData.x, playerData.y, playerData.velocityX, playerData.velocityY,
+                    playerData.isJumping, playerData.isMovingLeft, playerData.isMovingRight
+                );
+                
+                // Update remote players from received data
+                Array<MultiplayerManager.MultiplayerPlayer> multiplayerPlayers = multiplayerManager.getRemotePlayers();
+                for (int i = 0; i < multiplayerPlayers.size && i < remotePlayers.size; i++) {
+                    MultiplayerManager.MultiplayerPlayer mpPlayer = multiplayerPlayers.get(i);
+                    Player remotePlayer = remotePlayers.get(i);
+                    
+                    // Create PlayerData from multiplayer data
+                    MultiplayerService.PlayerData remoteData = new MultiplayerService.PlayerData(
+                        mpPlayer.getId(),
+                        mpPlayer.getX(), mpPlayer.getY(),
+                        mpPlayer.getVelocityX(), mpPlayer.getVelocityY(),
+                        mpPlayer.isJumping(),
+                        mpPlayer.isMovingLeft(), mpPlayer.isMovingRight()
+                    );
+                    remotePlayer.updateFromMultiplayerData(remoteData);
+                }
+            }
 
             // Check door overlap (AABB) when not complete
             if (!levelComplete) {
@@ -397,11 +503,20 @@ public class GameScreen implements Screen, InputProcessor {
             game.batch.draw(platformTexture, platformX, platformY, PLATFORM_WIDTH, PLATFORM_HEIGHT);
         }
 
-        // Draw the player
+        // Draw the local player
         if (!levelComplete) {
             game.batch.draw(player.getTexture(),
                 player.getBody().getPosition().x * player.getPPM() - player.getTexture().getWidth() / 2,
                 player.getBody().getPosition().y * player.getPPM() - player.getTexture().getHeight() / 2);
+        }
+        
+        // Draw remote players
+        if (multiplayerManager != null && multiplayerManager.isMultiplayerActive()) {
+            for (Player remotePlayer : remotePlayers) {
+                game.batch.draw(remotePlayer.getTexture(),
+                    remotePlayer.getBody().getPosition().x * remotePlayer.getPPM() - remotePlayer.getTexture().getWidth() / 2,
+                    remotePlayer.getBody().getPosition().y * remotePlayer.getPPM() - remotePlayer.getTexture().getHeight() / 2);
+            }
         }
 
         // Draw the door
@@ -417,6 +532,11 @@ public class GameScreen implements Screen, InputProcessor {
         // Draw the UI buttons
         stage.act(delta);
         stage.draw();
+        
+        // Render toast messages
+        if (toastManager != null) {
+            toastManager.render();
+        }
     }
 
     @Override
@@ -449,6 +569,9 @@ public class GameScreen implements Screen, InputProcessor {
         if (pauseIconTexture != null) pauseIconTexture.dispose();
         if (doorTexture != null) doorTexture.dispose();
         if (sidebarBgTexture != null) sidebarBgTexture.dispose();
+        if (remotePlayerTexture != null) remotePlayerTexture.dispose();
+        if (multiplayerManager != null) multiplayerManager.dispose();
+        if (toastManager != null) toastManager.dispose();
     }
 
     // InputProcessor methods for back button handling

@@ -136,7 +136,16 @@ public class MainMenuScreen implements Screen, InputProcessor {
             // Check if "ONLINE" button is clicked
             if (touchX >= buttonX && touchX <= buttonX + buttonWidth &&
                 touchY >= buttonY - buttonHeight && touchY <= buttonY) {
-                System.out.println("ONLINE button clicked!");
+                // Navigate to multiplayer menu
+                // Create desktop multiplayer service for now
+                com.newgame.teamtilt.multiplayer.MultiplayerService multiplayerService = 
+                    new com.newgame.teamtilt.multiplayer.DesktopMultiplayerService();
+                
+                com.newgame.teamtilt.multiplayer.MultiplayerManager multiplayerManager = 
+                    new com.newgame.teamtilt.multiplayer.MultiplayerManager(multiplayerService);
+                
+                game.setScreen(new MultiplayerMenuScreen(game, multiplayerManager));
+                dispose();
             }
         }
     }

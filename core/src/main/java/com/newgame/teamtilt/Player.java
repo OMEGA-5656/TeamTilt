@@ -3,6 +3,7 @@ package com.newgame.teamtilt;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
+import com.newgame.teamtilt.multiplayer.MultiplayerService;
 
 public class Player {
     private Body body;
@@ -10,9 +11,24 @@ public class Player {
     private final float PPM = 100f; // Pixels per meter
     private final float speed = 2.5f;
     private final float startX = 150, startY = 320; // Starting position
+    
+    // Multiplayer support
+    private String playerId;
+    private boolean isLocalPlayer;
+    private boolean isMovingLeft = false;
+    private boolean isMovingRight = false;
+    private boolean isJumping = false;
 
     public Player(World world, Texture texture) {
         this.texture = texture;
+        this.isLocalPlayer = true;
+        createPlayerBody(world);
+    }
+    
+    public Player(World world, Texture texture, String playerId) {
+        this.texture = texture;
+        this.playerId = playerId;
+        this.isLocalPlayer = false;
         createPlayerBody(world);
     }
 
@@ -36,6 +52,9 @@ public class Player {
     }
 
     public void updateMovement(boolean moveLeft, boolean moveRight) {
+        this.isMovingLeft = moveLeft;
+        this.isMovingRight = moveRight;
+        
         if (moveLeft) {
             body.setLinearVelocity(-speed, body.getLinearVelocity().y);
         }
@@ -45,7 +64,40 @@ public class Player {
     }
 
     public void jump() {
+        this.isJumping = true;
         body.applyLinearImpulse(new Vector2(0, 2f), body.getWorldCenter(), true);
+    }
+    
+    /**
+     * Update player from multiplayer data (for remote players)
+     */
+    public void updateFromMultiplayerData(MultiplayerService.PlayerData data) {
+        if (isLocalPlayer) return; // Don't update local player from network data
+        
+        body.setTransform(data.x / PPM, data.y / PPM, body.getAngle());
+        body.setLinearVelocity(data.velocityX, data.velocityY);
+        this.isMovingLeft = data.isMovingLeft;
+        this.isMovingRight = data.isMovingRight;
+        this.isJumping = data.isJumping;
+    }
+    
+    /**
+     * Get current player data for multiplayer synchronization
+     */
+    public MultiplayerService.PlayerData getPlayerData() {
+        Vector2 position = body.getPosition();
+        Vector2 velocity = body.getLinearVelocity();
+        
+        return new MultiplayerService.PlayerData(
+            playerId != null ? playerId : "local",
+            position.x * PPM,
+            position.y * PPM,
+            velocity.x,
+            velocity.y,
+            isJumping,
+            isMovingLeft,
+            isMovingRight
+        );
     }
 
     public boolean isFalling() {
@@ -70,5 +122,30 @@ public class Player {
 
     public float getSpeed() {
         return speed;
+    }
+    
+    // Getters for multiplayer
+    public String getPlayerId() {
+        return playerId;
+    }
+    
+    public boolean isLocalPlayer() {
+        return isLocalPlayer;
+    }
+    
+    public boolean isMovingLeft() {
+        return isMovingLeft;
+    }
+    
+    public boolean isMovingRight() {
+        return isMovingRight;
+    }
+    
+    public boolean isJumping() {
+        return isJumping;
+    }
+    
+    public void setJumping(boolean jumping) {
+        this.isJumping = jumping;
     }
 }

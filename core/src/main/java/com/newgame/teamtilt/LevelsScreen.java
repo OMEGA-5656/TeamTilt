@@ -20,20 +20,27 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.newgame.teamtilt.levels.LevelDefinition;
 import com.newgame.teamtilt.levels.LevelFactory;
 import com.newgame.teamtilt.levels.LevelProgress;
+import com.newgame.teamtilt.multiplayer.MultiplayerManager;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.InputProcessor;
 
 public class LevelsScreen implements Screen, InputProcessor {
     private final TeamTiltMain game;
     private final int worldIndex;
+    private final MultiplayerManager multiplayerManager;
     private final Stage stage;
     private final Skin skin;
     private Texture backIconTexture;
     private Texture greenUpTexture, greenDownTexture;
 
     public LevelsScreen(TeamTiltMain game, int worldIndex) {
+        this(game, worldIndex, null);
+    }
+    
+    public LevelsScreen(TeamTiltMain game, int worldIndex, MultiplayerManager multiplayerManager) {
         this.game = game;
         this.worldIndex = worldIndex;
+        this.multiplayerManager = multiplayerManager;
         this.stage = new Stage(new ScreenViewport());
         this.skin = createSkin();
         buildUi();
@@ -103,7 +110,7 @@ public class LevelsScreen implements Screen, InputProcessor {
                     @Override
                     public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
                         LevelDefinition def = LevelFactory.getLevel(worldIndex, levelIndex);
-                        game.setScreen(new GameScreen(game, def, worldIndex, levelIndex));
+                        game.setScreen(new GameScreen(game, def, worldIndex, levelIndex, multiplayerManager));
                         dispose();
                         return true;
                     }
